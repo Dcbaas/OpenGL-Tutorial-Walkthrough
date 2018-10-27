@@ -14,15 +14,15 @@ const GLint WIDTH = 800, HEIGHT = 600;
 GLuint VAO, VBO, shader; 
 
 //Create a vertex shader. Nomally this would be done with a file but not for this case. 
-static const char* vShader = "									\n\
-#version 330													\n\
-																\n\
-layout (location = 0) in vec3 pos;								\n\
-																\n\
-void main(){													\n\
-	gl_position = vec4(0.4 * pos.x, 0.4 * pos.y, pos.z, 1.0);	\n\
-}																\n\
-";
+static const char* vShader = "                                                \n\
+#version 330                                                                  \n\
+                                                                              \n\
+layout (location = 0) in vec3 pos;											  \n\
+                                                                              \n\
+void main()                                                                   \n\
+{                                                                             \n\
+    gl_Position = vec4(0.4 * pos.x, 0.4 * pos.y, pos.z, 1.0);				  \n\
+}";
 
 //Fragment Shader
 static const char* fShader = "						\n\
@@ -39,7 +39,7 @@ void create_triangle() {
 	GLfloat vertices[] = {
 		//First two are bot of triangle.
 		-1.0f, -1.0f, 0.0f,
-		 1.0f, -1.0, 0.0f,
+		 1.0f, -1.0f, 0.0f,
 		 0.0f, 1.0f, 0.0f
 	};
 
@@ -79,7 +79,7 @@ void addShader(GLuint program, const char* shaderCode, GLenum shaderType) {
 	glGetShaderiv(theShader, GL_COMPILE_STATUS, &result);
 	if (!result) {
 		glGetProgramInfoLog(theShader, sizeof(eLog), NULL, eLog);
-		std::cout << "Error compiling the shader" << shaderType << eLog << std::endl;
+		std::cout << "Error compiling the shader " << shaderType << eLog << std::endl;
 	}
 
 	glAttachShader(program, theShader);
@@ -97,7 +97,9 @@ void CompileShaders() {
 	}
 
 	addShader(shader, vShader, GL_VERTEX_SHADER);
+	std::cout << "Vertex Shader done" << std::endl;
 	addShader(shader, fShader, GL_FRAGMENT_SHADER);
+	std::cout << "Fragment Shader" << std::endl;
 
 	//Verify the Shader
 	GLint result = 0;
