@@ -15,9 +15,14 @@ const float toRadians = 3.1159265f / 180.0f;
 
 float currAngle = 0.0f;
 
+bool sizeDir = true;
+float currSize = 0.4f;
+float maxSize = 0.8f;
+float minSize = 0.1f;
+
 //For the first triangle we are drawing these are global variable
 //In future find out how not to use global variables
-GLuint VAO, VBO, shader , uniformModel; 
+GLuint VAO, VBO, IBO, shader , uniformModel, uniformProjecion; 
 
 bool direction = true; 
 float triOffset = 0.0f;
@@ -29,29 +34,45 @@ static const char* vShader = "                                                \n
 #version 330                                                                  \n\
                                                                               \n\
 layout (location = 0) in vec3 pos;											  \n\
+out vec4 vCol;																	\n\
                                                                               \n\
 uniform mat4 model;                                                          \n\
                                                                               \n\
+uniform mat4 projection;														\n\
+																			\n\
 void main()                                                                   \n\
 {                                                                             \n\
-    gl_Position = model * vec4(pos, 1.0);		  \n\
+    gl_Position = projection * model * vec4(pos, 1.0);										\n\
+	vCol = vec4(clamp(pos,0.0f, 1.0f), 1.0f);											\n\
 }";
 
 //Fragment Shader
 static const char* fShader = "						\n\
 #version 330										\n\
 													\n\
+													\n\
+													\n\
+in vec4 vCol;										\n\
 out vec4 color;										\n\
 													\n\
 void main(){										\n\
-	color = vec4(1.0, 0.0, 0.0, 1.0);				\n\
+	color = vCol;									\n\
 }													\n\
 ";
+
+
 void create_triangle() {
 	//Define the points for a triangle
-	GLfloat vertices[] = {
-		//First two are bot of triangle.
+	unsigned int indicies[] = {
+		0, 3, 1,
+		1, 3, 2,
+		2, 3, 0,
+		0, 1, 2
+
+	};
+	GLfloat vertices[] = {	
 		-1.0f, -1.0f, 0.0f,
+		0.0f, -1.0f, 1.0f,
 		 1.0f, -1.0f, 0.0f,
 		 0.0f, 1.0f, 0.0f
 	};
@@ -60,14 +81,20 @@ void create_triangle() {
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
 
-		//Create a Buffer object
-		glGenBuffers(1, &VBO);
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glGenBuffers(1, &IBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indicies), indicies, GL_STATIC_DRAW);
 
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	//Create a Buffer object
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 		
 	glBindVertexArray(0);
 
@@ -133,6 +160,7 @@ void CompileShaders() {
 	}
 
 	uniformModel = glGetUniformLocation(shader, "model");
+	uniformProjecion = glGetUniformLocation(shader, "projection");
 }
 
 int main(int argc, char** argv) {
@@ -180,11 +208,15 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	glEnable(GL_DEPTH_TEST);
+
 	//Setup Viewport size
 	glViewport(0, 0, bufferWidth, bufferHeight);
 
 	create_triangle();
 	CompileShaders();
+
+	glm::mat4 projection = glm::perspective(45.0f, (GLfloat)bufferWidth/(GLfloat)bufferHeight, 0.1f, 100.0f);
 
 	//Loop until window closed
 	while (!glfwWindowShouldClose(mainWindow)) {
@@ -202,16 +234,30 @@ int main(int argc, char** argv) {
 			direction = !direction;
 		}
 
-		currAngle += 0.01f;
+		currAngle += 0.05f;
 		if(currAngle >= 360)
 		{
 			currAngle -= 360;
+		}
+
+		if(sizeDir)
+		{
+			currSize += 0.0001f;
+		}
+		else
+		{
+			currSize -= 0.0001f;
+		}
+
+		if(currSize >= maxSize || currSize <= minSize)
+		{
+			sizeDir = !sizeDir;
 		}
 		 
 		//Clear the window 
 		//alpha value determines the opacity higher the more opaque. 
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUseProgram(shader);
 
@@ -219,17 +265,21 @@ int main(int argc, char** argv) {
 		//Specific instructor called in order for the identiy matrix to be created.
 		//Thus glm::mat4 model(1.0); and not glm::mat4 model;
 		glm::mat4 model(1.0);
-		// model = glm::translate(model, glm::vec3(triOffset, 0.0f, 0.0f));
-		// model = glm::rotate(model, currAngle * toRadians, glm::vec3(0.0f, 0.0f, 1.0f));
+
+		model = glm::translate(model, glm::vec3(0.0f, triOffset, -2.5f));
+		model = glm::rotate(model, currAngle * toRadians, glm::vec3(1.0f, 1.0f, 1.0f));
 		model = glm::scale(model, glm::vec3(0.4f, 0.4f, 1.0f));
 
 		glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+		glUniformMatrix4fv(uniformProjecion, 1, GL_FALSE, glm::value_ptr(projection));
 
 		glBindVertexArray(VAO);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0);
 
 		glBindVertexArray(0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 		glUseProgram(0);
 
