@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <cmath>
+#include <vector>
 
 //include the normal string lib for if it can be used instead
 #include <string>
@@ -10,8 +11,14 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#include "Mesh.h"
+#include "Shader.h"
 const GLint WIDTH = 800, HEIGHT = 600;
 const float toRadians = 3.1159265f / 180.0f;
+
+std::vector<Mesh*> meshList;
+std::vector<Shader> shaderList;
 
 float currAngle = 0.0f;
 
@@ -22,7 +29,7 @@ float minSize = 0.1f;
 
 //For the first triangle we are drawing these are global variable
 //In future find out how not to use global variables
-GLuint VAO, VBO, IBO, shader , uniformModel, uniformProjecion; 
+
 
 bool direction = true; 
 float triOffset = 0.0f;
@@ -30,38 +37,13 @@ float triMaxOffset = 0.7f;
 float triIncrement = 0.0005f;
 
 //Create a vertex shader. Nomally this would be done with a file but not for this case. 
-static const char* vShader = "                                                \n\
-#version 330                                                                  \n\
-                                                                              \n\
-layout (location = 0) in vec3 pos;											  \n\
-out vec4 vCol;																	\n\
-                                                                              \n\
-uniform mat4 model;                                                          \n\
-                                                                              \n\
-uniform mat4 projection;														\n\
-																			\n\
-void main()                                                                   \n\
-{                                                                             \n\
-    gl_Position = projection * model * vec4(pos, 1.0);										\n\
-	vCol = vec4(clamp(pos,0.0f, 1.0f), 1.0f);											\n\
-}";
+static const char* vShader = "Shaders/shader.vert";
 
 //Fragment Shader
-static const char* fShader = "						\n\
-#version 330										\n\
-													\n\
-													\n\
-													\n\
-in vec4 vCol;										\n\
-out vec4 color;										\n\
-													\n\
-void main(){										\n\
-	color = vCol;									\n\
-}													\n\
-";
+static const char* fShader = "Shaders/shader.frag";
 
 
-void create_triangle() {
+void create_objects() {
 	//Define the points for a triangle
 	unsigned int indicies[] = {
 		0, 3, 1,
@@ -77,90 +59,17 @@ void create_triangle() {
 		 0.0f, 1.0f, 0.0f
 	};
 
-	//Init VAO and bind it 
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
-
-	glGenBuffers(1, &IBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indicies), indicies, GL_STATIC_DRAW);
-
-	//Create a Buffer object
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-		
-	glBindVertexArray(0);
+	Mesh* obj1 = new Mesh();
+	obj1->createMesh(vertices, indicies, 12, 12);
+	meshList.push_back(obj1);
 
 }
 
-void addShader(GLuint program, const char* shaderCode, GLenum shaderType) {
-	GLuint theShader = glCreateShader(shaderType);
-
-	const GLchar* theCode[1];
-	theCode[0] = shaderCode;
-	
-	GLint codeLength[1];
-	codeLength[0] = strlen(shaderCode);
-
-	glShaderSource(theShader, 1, theCode, codeLength);
-	glCompileShader(theShader);
-
-	//Verify the Shader
-	GLint result = 0;
-	GLchar eLog[1024] = { 0 };
-
-	glGetShaderiv(theShader, GL_COMPILE_STATUS, &result);
-	if (!result) {
-		glGetProgramInfoLog(theShader, sizeof(eLog), NULL, eLog);
-		std::cout << "Error compiling the shader " << shaderType << eLog << std::endl;
-	}
-
-	glAttachShader(program, theShader);
-
-
-}
-
-void CompileShaders() {
-	shader = glCreateProgram();
-
-	if (!shader) {
-		std::cout << "ERROR creating Shader Program" << std::endl;
-		//This isn't error safe. make this safer later.
-		return;
-	}
-
-	addShader(shader, vShader, GL_VERTEX_SHADER);
-	std::cout << "Vertex Shader done" << std::endl;
-	addShader(shader, fShader, GL_FRAGMENT_SHADER);
-	std::cout << "Fragment Shader" << std::endl;
-
-	//Verify the Shader
-	GLint result = 0;
-	GLchar eLog[1024] = { 0 };
-
-	glLinkProgram(shader);
-	glGetProgramiv(shader, GL_LINK_STATUS, &result);
-	if (!result) {
-		glGetProgramInfoLog(shader, sizeof(eLog), NULL, eLog);
-		std::cout << "Error linking program" << std::endl << eLog << std::endl;
-	}
-
-	glValidateProgram(shader);
-	glGetProgramiv(shader, GL_VALIDATE_STATUS, &result);
-	if (!result) {
-		glGetProgramInfoLog(shader, sizeof(eLog), NULL, eLog);
-		std::cout << "Error validating program" << std::endl << eLog << std::endl;
-	}
-
-	uniformModel = glGetUniformLocation(shader, "model");
-	uniformProjecion = glGetUniformLocation(shader, "projection");
+void create_shaders()
+{
+	Shader* shader1 = new Shader();
+	shader1->create_from_file(vShader, fShader);
+	shaderList.push_back(*shader1);
 }
 
 int main(int argc, char** argv) {
@@ -213,8 +122,10 @@ int main(int argc, char** argv) {
 	//Setup Viewport size
 	glViewport(0, 0, bufferWidth, bufferHeight);
 
-	create_triangle();
-	CompileShaders();
+	create_objects();
+	create_shaders();
+
+	GLuint uniformProjection = 0, uniformModel = 0; 
 
 	glm::mat4 projection = glm::perspective(45.0f, (GLfloat)bufferWidth/(GLfloat)bufferHeight, 0.1f, 100.0f);
 
@@ -259,7 +170,9 @@ int main(int argc, char** argv) {
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glUseProgram(shader);
+		shaderList[0].use_shader();
+		uniformModel = shaderList[0].get_model_location();
+		uniformProjection = shaderList[0].get_projection_location();
 
 		//This doen't work the same as in the tutorial. It needs to have a 
 		//Specific instructor called in order for the identiy matrix to be created.
@@ -271,15 +184,9 @@ int main(int argc, char** argv) {
 		model = glm::scale(model, glm::vec3(0.4f, 0.4f, 1.0f));
 
 		glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
-		glUniformMatrix4fv(uniformProjecion, 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(uniformProjection, 1, GL_FALSE, glm::value_ptr(projection));
 
-		glBindVertexArray(VAO);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-
-		glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0);
-
-		glBindVertexArray(0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		meshList[0]->renderMesh();
 
 		glUseProgram(0);
 
